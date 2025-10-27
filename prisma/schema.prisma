@@ -1,0 +1,135 @@
+// Prisma Schema for Wholesale Fashion Orders
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for admin authentication
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Product in catalog
+model Product {
+  id                String        @id @default(cuid())
+  sku               String        @unique // דגם
+  name              String // שם
+  color             String // צבע
+  unitPrice         Float // מחיר יחידה
+  priceIncludesVat  Boolean       @default(false) // האם המחיר כולל מע"מ
+  sizeSet           String?       @default("34-42") // טווח מידות
+  active            Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  sizes             ProductSize[]
+  orderItems        OrderItem[]
+
+  @@index([sku])
+  @@index([active])
+}
+
+// Available sizes
+model Size {
+  id       String        @id @default(cuid())
+  name     String        @unique // "34", "36", "38", "40", "42"
+  products ProductSize[]
+}
+
+// Many-to-many relation between Product and Size
+model ProductSize {
+  id        String  @id @default(cuid())
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+  size      Size    @relation(fields: [sizeId], references: [id], onDelete: Cascade)
+  sizeId    String
+
+  @@unique([productId, sizeId])
+  @@index([productId])
+  @@index([sizeId])
+}
+
+// Customer order
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique @default(cuid()) // מספר הזמנה
+  retailerName    String // שם החנות
+  vatNumber       String? // עוסק מורשה / ח.פ
+  contactName     String // איש קשר
+  phone           String // טלפון
+  email           String // מייל
+  shippingAddress String // כתובת משלוח
+  notes           String?     @db.Text // הערות
+  requestedDate   DateTime? // תאריך מבוקש
+
+  subtotal        Float // סה"כ לפני מע"מ
+  vat             Float // מע"מ
+  total           Float // סה"כ אחרי מע"מ
+
+  pdfPath         String? // נתיב ל-PDF
+  csvPath         String? // נתיב ל-CSV
+
+  status          String      @default("pending") // pending, confirmed, cancelled
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  items           OrderItem[]
+
+  @@index([orderNumber])
+  @@index([email])
+  @@index([createdAt])
+}
+
+// Line item in order
+model OrderItem {
+  id              String  @id @default(cuid())
+  order           Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId         String
+  product         Product @relation(fields: [productId], references: [id])
+  productId       String
+
+  // Snapshot of product data at order time
+  sku             String
+  name            String
+  color           String
+  unitPrice       Float
+  priceIncludesVat Boolean
+
+  // Quantities by size
+  qty34           Int     @default(0)
+  qty36           Int     @default(0)
+  qty38           Int     @default(0)
+  qty40           Int     @default(0)
+  qty42           Int     @default(0)
+
+  // Line totals
+  lineSubtotal    Float // סה"כ שורה לפני מע"מ
+  lineVat         Float // מע"מ שורה
+  lineTotal       Float // סה"כ שורה אחרי מע"מ
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+// System settings
+model Settings {
+  id            String   @id @default("singleton")
+  vatRate       Float    @default(0.17) // 17%
+  minOrderAmount Float?  // סכום הזמנה מינימלי
+  businessEmail String   @default("orders@example.com")
+  logoUrl       String?
+  termsHtml     String?  @db.Text
+  updatedAt     DateTime @updatedAt
+}
