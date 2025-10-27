@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// משתמש אדמין
+model Admin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("admins")
+}
+
+// מידה
+model Size {
+  id           String        @id @default(cuid())
+  name         String        @unique // "34", "36", "38", "40", "42"
+  createdAt    DateTime      @default(now())
+  ProductSize  ProductSize[]
+
+  @@map("sizes")
+}
+
+// מוצר
+model Product {
+  id                String        @id @default(cuid())
+  sku               String        @unique // דגם
+  name              String        // שם
+  color             String        // צבע
+  unitPrice         Float         // מחיר יחידה
+  priceIncludesVat  Boolean       @default(false) // כולל מע״מ
+  sizeSet           String?       // "34-42"
+  active            Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  sizes             ProductSize[]
+  orderItems        OrderItem[]
+
+  @@map("products")
+}
+
+// קישור מוצר למידה
+model ProductSize {
+  id        String   @id @default(cuid())
+  productId String
+  sizeId    String
+  createdAt DateTime @default(now())
+
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  size      Size     @relation(fields: [sizeId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, sizeId])
+  @@map("product_sizes")
+}
+
+// הזמנה
+model Order {
+  id              String      @id @default(cuid())
+  retailerName    String      // שם חנות
+  vatNumber       String?     // עוסק מורשה / ח.פ
+  contactName     String      // איש קשר
+  phone           String      // טלפון
+  email           String      // אימייל
+  shippingAddress String      // כתובת משלוח
+  notes           String?     // הערות
+  requestedDate   DateTime?   // תאריך מבוקש
+  subtotal        Float       // סה"כ לפני מע"מ
+  vat             Float       // מע"מ
+  total           Float       // סה"כ אחרי מע"מ
+  pdfUrl          String?     // קישור ל-PDF
+  csvUrl          String?     // קישור ל-CSV
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  items           OrderItem[]
+
+  @@map("orders")
+}
+
+// פריט בהזמנה
+model OrderItem {
+  id              String   @id @default(cuid())
+  orderId         String
+  productId       String
+  unitPrice       Float    // מחיר יחידה בזמן ההזמנה
+  priceIncludesVat Boolean  // כולל מע״מ
+  qty34           Int      @default(0)
+  qty36           Int      @default(0)
+  qty38           Int      @default(0)
+  qty40           Int      @default(0)
+  qty42           Int      @default(0)
+  lineSubtotal    Float    // סכום שורה לפני מע"מ
+  lineVat         Float    // מע"מ שורה
+  lineTotal       Float    // סכום שורה כולל מע"מ
+  createdAt       DateTime @default(now())
+
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product  @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+// הגדרות
+model Settings {
+  id            String   @id @default(cuid())
+  vatRate       Float    @default(0.17) // אחוז מע״מ (17%)
+  minOrderAmount Float?  // מינימום הזמנה
+  businessEmail String   // אימייל העסק
+  logoUrl       String?  // לוגו
+  termsHtml     String?  @db.Text // תנאים (HTML)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("settings")
+}
